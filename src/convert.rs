@@ -1,11 +1,8 @@
 use rs_plugin_common_interfaces::{
-    domain::{
+    RsRequest, domain::{
         external_images::{ExternalImage, ImageType},
-        serie::{Serie, SerieStatus},
-    },
-    lookup::RsLookupMetadataResult,
-    lookup::RsLookupMetadataResultWithImages,
-    RsRequest,
+        serie::{Serie, SerieStatus, SerieType},
+    }, lookup::{RsLookupMetadataResult, RsLookupMetadataResultWithImages}
 };
 use serde_json::json;
 
@@ -176,7 +173,7 @@ pub fn mal_anime_to_result(media: MyAnimeListAnime) -> RsLookupMetadataResultWit
     let serie = Serie {
         id: format!("mal:{}", media.id),
         name: best_title(&media),
-        kind: media.media_type.clone(),
+        kind: media.media_type.clone().map(|f| SerieType::from_string(&f)),
         alt: alt_names(&media),
         status: map_status(&media.status),
         year: year_from_start_date(&media.start_date),
@@ -190,6 +187,7 @@ pub fn mal_anime_to_result(media: MyAnimeListAnime) -> RsLookupMetadataResultWit
     RsLookupMetadataResultWithImages {
         metadata: RsLookupMetadataResult::Serie(serie),
         images,
+        ..Default::default()
     }
 }
 

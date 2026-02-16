@@ -75,6 +75,42 @@ fn test_lookup_without_credential_returns_401() {
 }
 
 #[test]
+fn test_lookup_one_punch_man_by_name() {
+    let Some(credential) = mal_credential() else {
+        eprintln!("Skipping test_lookup_one_punch_man_by_name: MAL_CLIENT_ID is not set");
+        return;
+    };
+
+    let mut plugin = build_plugin();
+
+    let input = RsLookupWrapper {
+        query: RsLookupQuery::Serie(RsLookupSerie {
+            name: Some("one punch man".to_string()),
+            ids: None,
+        }),
+        credential: Some(credential),
+        params: None,
+    };
+
+    let results = call_lookup(&mut plugin, &input);
+    let results_array = results.as_array().expect("Expected an array");
+    assert!(
+        !results_array.is_empty(),
+        "Expected at least one result for 'one punch man'"
+    );
+
+    println!(
+        "\n=== One Punch Man search results ({} found) ===",
+        results_array.len()
+    );
+    for (i, result) in results_array.iter().take(1).enumerate() {
+        println!("\n--- Result {} ---", i + 1);
+        println!("{}", serde_json::to_string_pretty(result).unwrap());
+    }
+}
+
+
+#[test]
 fn test_lookup_one_piece_by_name() {
     let Some(credential) = mal_credential() else {
         eprintln!("Skipping test_lookup_one_piece_by_name: MAL_CLIENT_ID is not set");
