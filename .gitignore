@@ -1,0 +1,6 @@
+/target
+Cargo.lock
+/*.json
+
+.DS_Store
+.env.test
