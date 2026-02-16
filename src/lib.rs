@@ -22,7 +22,7 @@ pub fn infos() -> FnResult<Json<PluginInformation>> {
         capabilities: vec![PluginType::LookupMetadata],
         version: 2,
         interface_version: 1,
-        repo: None,
+        repo: Some("https://github.com/neckaros/rs-plugin-mal".into()),
         publisher: "neckaros".into(),
         description: "Look up anime metadata from MyAnimeList".into(),
         credential_kind: Some(CredentialType::Token),
