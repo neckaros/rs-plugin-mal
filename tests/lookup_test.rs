@@ -109,7 +109,6 @@ fn test_lookup_one_punch_man_by_name() {
     }
 }
 
-
 #[test]
 fn test_lookup_one_piece_by_name() {
     let Some(credential) = mal_credential() else {

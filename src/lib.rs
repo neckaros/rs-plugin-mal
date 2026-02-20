@@ -2,7 +2,7 @@ use extism_pdk::{http, log, plugin_fn, FnResult, HttpRequest, Json, LogLevel, Wi
 
 use rs_plugin_common_interfaces::{
     domain::external_images::ExternalImage,
-    lookup::{RsLookupMetadataResultWithImages, RsLookupQuery, RsLookupWrapper},
+    lookup::{RsLookupMetadataResultWrapper, RsLookupQuery, RsLookupWrapper},
     CredentialType, CustomParam, CustomParamTypes, PluginInformation, PluginType,
 };
 
@@ -20,7 +20,7 @@ pub fn infos() -> FnResult<Json<PluginInformation>> {
     Ok(Json(PluginInformation {
         name: "myanimelist_metadata".into(),
         capabilities: vec![PluginType::LookupMetadata],
-        version: 2,
+        version: 3,
         interface_version: 1,
         repo: Some("https://github.com/neckaros/rs-plugin-mal".into()),
         publisher: "neckaros".into(),
@@ -197,10 +197,10 @@ fn execute_search_request(url: String, client_id: &str) -> FnResult<Vec<MyAnimeL
 #[plugin_fn]
 pub fn lookup_metadata(
     Json(lookup): Json<RsLookupWrapper>,
-) -> FnResult<Json<Vec<RsLookupMetadataResultWithImages>>> {
+) -> FnResult<Json<Vec<RsLookupMetadataResultWrapper>>> {
     let all_media = lookup_media(&lookup)?;
 
-    let results: Vec<RsLookupMetadataResultWithImages> =
+    let results: Vec<RsLookupMetadataResultWrapper> =
         all_media.into_iter().map(mal_anime_to_result).collect();
 
     Ok(Json(results))

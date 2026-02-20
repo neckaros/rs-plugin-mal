@@ -1,12 +1,19 @@
 use rs_plugin_common_interfaces::{
-    RsRequest, domain::{
+    domain::{
         external_images::{ExternalImage, ImageType},
+        person::Person,
         serie::{Serie, SerieStatus, SerieType},
-    }, lookup::{RsLookupMetadataResult, RsLookupMetadataResultWithImages}
+        tag::Tag,
+        Relations,
+    },
+    lookup::{RsLookupMetadataResult, RsLookupMetadataResultWrapper},
+    RsRequest,
 };
 use serde_json::json;
 
-use crate::mal::{MyAnimeListAlternativeTitles, MyAnimeListAnime, MyAnimeListPicture};
+use crate::mal::{
+    MyAnimeListAlternativeTitles, MyAnimeListAnime, MyAnimeListPicture, MyAnimeListStudio,
+};
 
 fn best_title(media: &MyAnimeListAnime) -> String {
     media
@@ -119,6 +126,120 @@ fn build_images(media: &MyAnimeListAnime) -> Vec<ExternalImage> {
     images
 }
 
+fn slugify(value: &str) -> String {
+    let mut slug = String::with_capacity(value.len());
+    let mut previous_was_dash = false;
+
+    for c in value.chars() {
+        if c.is_ascii_alphanumeric() {
+            slug.push(c.to_ascii_lowercase());
+            previous_was_dash = false;
+        } else if !previous_was_dash {
+            slug.push('-');
+            previous_was_dash = true;
+        }
+    }
+
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+
+    if slug.starts_with('-') {
+        slug.remove(0);
+    }
+
+    if slug.is_empty() {
+        "unknown".to_string()
+    } else {
+        slug
+    }
+}
+
+fn build_people_details(media: &MyAnimeListAnime) -> Option<Vec<Person>> {
+    media.studios.as_ref().and_then(|studios| {
+        let people = studios
+            .iter()
+            .filter_map(|studio| {
+                if studio.name.trim().is_empty() {
+                    return None;
+                }
+
+                let person_key = studio
+                    .id
+                    .map(|id| format!("{}-{id}", slugify(&studio.name)))
+                    .unwrap_or_else(|| slugify(&studio.name));
+                let other_id = format!("mal-person:{person_key}");
+
+                let mut params = serde_json::Map::new();
+                params.insert("otherids".to_string(), json!([other_id.clone()]));
+                if let Some(studio_id) = studio.id {
+                    params.insert("malId".to_string(), json!(studio_id));
+                }
+
+                Some(Person {
+                    id: other_id,
+                    name: studio.name.clone(),
+                    kind: Some("studio".to_string()),
+                    params: Some(serde_json::Value::Object(params)),
+                    generated: true,
+                    ..Default::default()
+                })
+            })
+            .collect::<Vec<_>>();
+
+        if people.is_empty() {
+            None
+        } else {
+            Some(people)
+        }
+    })
+}
+
+fn build_tags_details(media: &MyAnimeListAnime) -> Option<Vec<Tag>> {
+    media.genres.as_ref().and_then(|genres| {
+        let tags = genres
+            .iter()
+            .filter_map(|genre| {
+                if genre.name.trim().is_empty() {
+                    return None;
+                }
+
+                let tag_key = genre
+                    .id
+                    .map(|id| id.to_string())
+                    .unwrap_or_else(|| slugify(&genre.name));
+                let other_id = format!("mal-tag:{tag_key}");
+
+                let mut params = serde_json::Map::new();
+                params.insert("otherids".to_string(), json!([other_id.clone()]));
+                if let Some(genre_id) = genre.id {
+                    params.insert("malId".to_string(), json!(genre_id));
+                }
+
+                Some(Tag {
+                    id: other_id,
+                    name: genre.name.clone(),
+                    parent: None,
+                    kind: Some("genre".to_string()),
+                    alt: None,
+                    thumb: None,
+                    params: Some(serde_json::Value::Object(params)),
+                    modified: 0,
+                    added: 0,
+                    generated: true,
+                    path: "/".to_string(),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        if tags.is_empty() {
+            None
+        } else {
+            Some(tags)
+        }
+    })
+}
+
 fn collect_genre_names(titles: &Option<Vec<crate::mal::MyAnimeListGenre>>) -> Option<Vec<String>> {
     titles.as_ref().map(|items| {
         items
@@ -167,8 +288,26 @@ fn build_params(media: &MyAnimeListAnime) -> serde_json::Value {
     serde_json::Value::Object(params)
 }
 
-pub fn mal_anime_to_result(media: MyAnimeListAnime) -> RsLookupMetadataResultWithImages {
+pub fn mal_anime_to_result(media: MyAnimeListAnime) -> RsLookupMetadataResultWrapper {
     let images = build_images(&media);
+    let ext_images = if images.is_empty() {
+        None
+    } else {
+        Some(images)
+    };
+    let people_details = build_people_details(&media);
+    let tags_details = build_tags_details(&media);
+
+    let relations = if ext_images.is_some() || people_details.is_some() || tags_details.is_some() {
+        Some(Relations {
+            people_details,
+            tags_details,
+            ext_images,
+            ..Default::default()
+        })
+    } else {
+        None
+    };
 
     let serie = Serie {
         id: format!("mal:{}", media.id),
@@ -184,10 +323,9 @@ pub fn mal_anime_to_result(media: MyAnimeListAnime) -> RsLookupMetadataResultWit
         ..Default::default()
     };
 
-    RsLookupMetadataResultWithImages {
+    RsLookupMetadataResultWrapper {
         metadata: RsLookupMetadataResult::Serie(serie),
-        images,
-        ..Default::default()
+        relations,
     }
 }
 
@@ -227,7 +365,12 @@ mod tests {
             num_episodes: Some(1000),
             status: Some("currently_airing".to_string()),
             genres: Some(vec![crate::mal::MyAnimeListGenre {
+                id: Some(2),
                 name: "Adventure".to_string(),
+            }]),
+            studios: Some(vec![MyAnimeListStudio {
+                id: Some(18),
+                name: "Toei Animation".to_string(),
             }]),
             media_type: Some("tv".to_string()),
             rating: Some("pg_13".to_string()),
@@ -287,5 +430,42 @@ mod tests {
     fn test_year_from_start_date() {
         let media = sample_media();
         assert_eq!(year_from_start_date(&media.start_date), Some(1999));
+    }
+
+    #[test]
+    fn test_result_relations_include_images_people_and_tags_details() {
+        let media = sample_media();
+        let result = mal_anime_to_result(media);
+        let relations = result.relations.expect("Expected relations");
+
+        let images = relations.ext_images.expect("Expected ext_images");
+        assert_eq!(images.len(), 2);
+
+        let people = relations.people_details.expect("Expected people_details");
+        assert_eq!(people.len(), 1);
+        assert_eq!(people[0].id, "mal-person:toei-animation-18");
+        assert_eq!(people[0].name, "Toei Animation");
+        assert_eq!(
+            people[0]
+                .params
+                .as_ref()
+                .and_then(|params| params.get("otherids")),
+            Some(&json!(["mal-person:toei-animation-18"]))
+        );
+
+        let tags = relations.tags_details.expect("Expected tags_details");
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].id, "mal-tag:2");
+        assert_eq!(tags[0].name, "Adventure");
+        assert_eq!(
+            tags[0]
+                .params
+                .as_ref()
+                .and_then(|params| params.get("otherids")),
+            Some(&json!(["mal-tag:2"]))
+        );
+
+        assert!(relations.people.is_none());
+        assert!(relations.tags.is_none());
     }
 }

@@ -24,6 +24,7 @@ pub struct MyAnimeListAnime {
     pub num_episodes: Option<u32>,
     pub status: Option<String>,
     pub genres: Option<Vec<MyAnimeListGenre>>,
+    pub studios: Option<Vec<MyAnimeListStudio>>,
     pub media_type: Option<String>,
     pub rating: Option<String>,
     pub nsfw: Option<String>,
@@ -48,10 +49,17 @@ pub struct MyAnimeListAlternativeTitles {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct MyAnimeListGenre {
+    pub id: Option<u64>,
     pub name: String,
 }
 
-const FULL_FIELDS: &str = "id,title,main_picture,alternative_titles,start_date,synopsis,mean,popularity,num_episodes,status,genres,media_type,rating,nsfw,pictures,trailer_url,background";
+#[derive(Debug, Deserialize, Clone)]
+pub struct MyAnimeListStudio {
+    pub id: Option<u64>,
+    pub name: String,
+}
+
+const FULL_FIELDS: &str = "id,title,main_picture,alternative_titles,start_date,synopsis,mean,popularity,num_episodes,status,genres,studios,media_type,rating,nsfw,pictures,trailer_url,background";
 const IMAGE_FIELDS: &str = "id,title,main_picture,pictures";
 
 fn encode_query_component(value: &str) -> String {
