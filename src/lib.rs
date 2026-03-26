@@ -2,8 +2,9 @@ use extism_pdk::{http, log, plugin_fn, FnResult, HttpRequest, Json, LogLevel, Wi
 
 use rs_plugin_common_interfaces::{
     domain::external_images::ExternalImage,
-    lookup::{RsLookupMetadataResultWrapper, RsLookupQuery, RsLookupWrapper},
+    lookup::{RsLookupMetadataResultWrapper, RsLookupMetadataResults, RsLookupQuery, RsLookupWrapper},
     CredentialType, CustomParam, CustomParamTypes, PluginInformation, PluginType,
+
 };
 
 mod convert;
@@ -20,7 +21,7 @@ pub fn infos() -> FnResult<Json<PluginInformation>> {
     Ok(Json(PluginInformation {
         name: "myanimelist_metadata".into(),
         capabilities: vec![PluginType::LookupMetadata],
-        version: 3,
+        version: 5,
         interface_version: 1,
         repo: Some("https://github.com/neckaros/rs-plugin-mal".into()),
         publisher: "neckaros".into(),
@@ -38,8 +39,8 @@ pub fn infos() -> FnResult<Json<PluginInformation>> {
 
 fn extract_mal_id(query: &RsLookupQuery) -> Option<u64> {
     match query {
-        RsLookupQuery::Serie(s) => s.ids.as_ref().and_then(|ids| ids.myanimelist_manga_id),
-        RsLookupQuery::Movie(m) => m.ids.as_ref().and_then(|ids| ids.myanimelist_manga_id),
+        RsLookupQuery::Serie(s) => s.ids.as_ref().and_then(|ids| ids.myanimelist_manga_id()),
+        RsLookupQuery::Movie(m) => m.ids.as_ref().and_then(|ids| ids.myanimelist_manga_id()),
         _ => None,
     }
 }
@@ -62,8 +63,15 @@ fn extract_client_id(lookup: &RsLookupWrapper) -> Option<String> {
     })
 }
 
-fn parse_bool(value: &str) -> Option<bool> {
-    match value.trim().to_ascii_lowercase().as_str() {
+fn parse_bool_param(value: &CustomParamTypes) -> Option<bool> {
+    let text = match value {
+        CustomParamTypes::Text(Some(s)) | CustomParamTypes::Url(Some(s)) => s.clone(),
+        CustomParamTypes::Integer(Some(v)) => v.to_string(),
+        CustomParamTypes::UInteger(Some(v)) => v.to_string(),
+        CustomParamTypes::Float(Some(v)) => v.to_string(),
+        _ => return None,
+    };
+    match text.trim().to_ascii_lowercase().as_str() {
         "true" | "1" | "yes" | "on" => Some(true),
         "false" | "0" | "no" | "off" => Some(false),
         _ => None,
@@ -83,7 +91,7 @@ fn extract_allow_nsfw(lookup: &RsLookupWrapper) -> bool {
             .iter()
             .find_map(|key| params.get(*key))
         })
-        .and_then(|value| parse_bool(value))
+        .and_then(|value| parse_bool_param(value))
         .unwrap_or(false)
 }
 
@@ -197,13 +205,13 @@ fn execute_search_request(url: String, client_id: &str) -> FnResult<Vec<MyAnimeL
 #[plugin_fn]
 pub fn lookup_metadata(
     Json(lookup): Json<RsLookupWrapper>,
-) -> FnResult<Json<Vec<RsLookupMetadataResultWrapper>>> {
+) -> FnResult<Json<RsLookupMetadataResults>> {
     let all_media = lookup_media(&lookup)?;
 
     let results: Vec<RsLookupMetadataResultWrapper> =
         all_media.into_iter().map(mal_anime_to_result).collect();
 
-    Ok(Json(results))
+    Ok(Json(RsLookupMetadataResults { results, next_page_key: None }))
 }
 
 fn lookup_media(lookup: &RsLookupWrapper) -> FnResult<Vec<MyAnimeListAnime>> {

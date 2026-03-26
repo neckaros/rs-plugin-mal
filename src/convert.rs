@@ -217,7 +217,7 @@ fn build_tags_details(media: &MyAnimeListAnime) -> Option<Vec<Tag>> {
                 }
 
                 Some(Tag {
-                    id: other_id,
+                    id: other_id.clone(),
                     name: genre.name.clone(),
                     parent: None,
                     kind: Some("genre".to_string()),
@@ -228,6 +228,7 @@ fn build_tags_details(media: &MyAnimeListAnime) -> Option<Vec<Tag>> {
                     added: 0,
                     generated: true,
                     path: "/".to_string(),
+                    otherids: Some(rs_plugin_common_interfaces::domain::other_ids::OtherIds(vec![other_id])),
                 })
             })
             .collect::<Vec<_>>();
@@ -326,6 +327,7 @@ pub fn mal_anime_to_result(media: MyAnimeListAnime) -> RsLookupMetadataResultWra
     RsLookupMetadataResultWrapper {
         metadata: RsLookupMetadataResult::Serie(serie),
         relations,
+        match_type: None,
     }
 }
 

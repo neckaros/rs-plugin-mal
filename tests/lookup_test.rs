@@ -156,9 +156,10 @@ fn test_lookup_one_piece_by_mal_id() {
     let input = RsLookupWrapper {
         query: RsLookupQuery::Serie(RsLookupSerie {
             name: None,
-            ids: Some(RsIds {
-                myanimelist_manga_id: Some(21),
-                ..Default::default()
+            ids: Some({
+                let mut ids = RsIds::default();
+                ids.set("mal", 21);
+                ids
             }),
         }),
         credential: Some(credential),
@@ -223,9 +224,10 @@ fn test_lookup_images_by_mal_id() {
     let input = RsLookupWrapper {
         query: RsLookupQuery::Serie(RsLookupSerie {
             name: None,
-            ids: Some(RsIds {
-                myanimelist_manga_id: Some(21),
-                ..Default::default()
+            ids: Some({
+                let mut ids = RsIds::default();
+                ids.set("mal", 21);
+                ids
             }),
         }),
         credential: Some(credential),
